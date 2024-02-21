@@ -232,7 +232,7 @@ def main():
 
 	# Logging and saving steps
 	parser.add_argument("--logging_steps", type=int, default=25, help="Log every X updates steps.")
-	parser.add_argument("--save_steps", type=int, default=2500, help="Save checkpoint every X updates steps.")
+	parser.add_argument("--save_steps", type=int, default=10000, help="Save checkpoint every X updates steps.")
 	parser.add_argument("--seed", type=int, default=2023, help="random seed for initialization")
 
 	# parse the arguments
