@@ -26,6 +26,12 @@ logging.basicConfig(format='%(asctime)s - %(message)s',
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
+		"--res_dir",
+		type=str,
+		default="/vol/tmp/lethanhd/MedCPT/evals/results",
+		help="The evaluation dataset."
+	)
+	parser.add_argument(
 			"--dataset",
 			type=str,
 			default="scifact",
@@ -77,22 +83,32 @@ if __name__ == "__main__":
 
 	bi_encoder = DRES(DenseRetriever(args.query_enc_path, args.doc_enc_path, args.retriever_tokenizer_path, device), batch_size=16)
 	retriever = EvaluateRetrieval(bi_encoder, score_function="dot")
-	
-	url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/data/{}.zip".format(args.dataset)
-	out_dir = os.path.join(os.getcwd(), "data")
-	data_path = util.download_and_unzip(url, out_dir)
-	print("Dataset downloaded here: {}".format(data_path))
 
-	data_path = f'data/{args.dataset}'
-	corpus, queries, qrels = GenericDataLoader(data_path).load(split="test") # or split = "train" or "dev
-	results = retriever.retrieve(corpus, queries)
-	output = {'retrieval': EvaluateRetrieval.evaluate(qrels, results, retriever.k_values)}
+	if not os.path.exists(args.res_dir):
+		os.makedirs(args.res_dir)
 
-	if args.reranking:
-		cross_encoder = CrossEncoder(args.cross_enc_path, args.reranker_tokenizer_path, device)
-		reranker = Rerank(cross_encoder, batch_size=16)
-		rerank_results = reranker.rerank(corpus, queries, results, top_k=args.top_k)
-		output['reranking'] = EvaluateRetrieval.evaluate(qrels, rerank_results, retriever.k_values)
+	if args.dataset == 'all':
+		datasets = ['trec-covid', 'nfcorpus', 'scifact', 'scidocs', 'bioasq']
+	else:
+		datasets = [args.dataset]
 
-	with open(f'results/{args.dataset}_results.json', 'w') as f:
-		json.dump(output, f, indent=4)
+	for dataset in datasets:
+		if dataset != 'bioasq':
+			url = "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{}.zip".format(dataset)
+			out_dir = os.path.join(os.getcwd(), "data")
+			data_path = util.download_and_unzip(url, out_dir)
+			print("Dataset downloaded here: {}".format(data_path))
+
+		data_path = f'data/{dataset}'
+		corpus, queries, qrels = GenericDataLoader(data_path).load(split="test") # or split = "train" or "dev
+		results = retriever.retrieve(corpus, queries)
+		output = {'retrieval': EvaluateRetrieval.evaluate(qrels, results, retriever.k_values)}
+
+		if args.reranking:
+			cross_encoder = CrossEncoder(args.cross_enc_path, args.reranker_tokenizer_path, device)
+			reranker = Rerank(cross_encoder, batch_size=16)
+			rerank_results = reranker.rerank(corpus, queries, results, top_k=args.top_k)
+			output['reranking'] = EvaluateRetrieval.evaluate(qrels, rerank_results, retriever.k_values)
+
+		with open(os.path.join(args.res_dir, f'{dataset}_results.json'), 'w') as f:
+			json.dump(output, f, indent=4)
